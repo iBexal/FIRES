@@ -42,14 +42,13 @@ def get_coords(header):
     dec = comment[1]
     return ra, dec
 
-def order_tracing(header, data):
+def order_tracing(header, data, extract=False):
+
     # get obs type
     obs_type = check_obs_type(header)
-    if obs_type == 'thorium':
-        print('Thorium, cannot order trace')
-        return None
-    
-    # data = data[350:-350,500:]
+    # if obs_type == 'thorium':
+    #     print('Thorium, cannot order trace')
+    #     return None
     
     reference_column = int(data.shape[0] / 2) # Reference column for tracing (middle of the image)
     # spatial_profile = np.median(data, axis=0)  # Median collapse along y-axis
@@ -84,7 +83,6 @@ def order_tracing(header, data):
         y_positions = [reference_column]
 
         # Trace downwards
-        fluxes = []
         for y in range(reference_column + 1, data.shape[0]):
             search_range = 10
             x_min = max(0, x_positions[-1] - search_range)
@@ -192,42 +190,23 @@ def find_tellurics(orders):
         if len(peaks) > 0:
             no_peaks += 1
     
-    obj_type_guess = 'stellar'
+    obj_type_guess = ' Stellar'
     if no_peaks == 0:
-        obj_type_guess = 'white'
+        obj_type_guess = ' White Light'
+    
+    if obj_type_guess == ' Stellar':
+        if len(tellurics) <= 3:
+            obj_type_guess = ' Thorium Light'
     return tellurics, obj_type_guess
 
 
-# header, data = open_fits('test_data/correct/J0763019.fit')
 files = ['16', '17', '18', '19', '28', '29', '42']
 for i in files:
     header, data = open_fits(f'test_data/correct/J07630{i}.fit')
-
     data = data[:, 3300:3600]
-
-    orders = order_tracing(header, data)
-    if orders is None:
-        continue
+    
+    orders = order_tracing(header, data)    
     fluxes = get_flux_from_orders(data, orders)
     norm_fluxes = cut_order_edge(norm_orders(fluxes))
     peaks = find_tellurics(norm_fluxes)
-
-
-    print(peaks[1], header['HERCEXPT'])
-
-
-plt.figure()
-
-
-add=0
-for i, order in enumerate(norm_fluxes):
-    xs = np.array(range(len(order)))
-    plt.plot(xs+add, order)
-    add += xs[-1]
-
-# plt.xlim(10000,12000)
-# plt.figure()
-# plt.imshow(data, cmap='gray', vmin=np.percentile(data, 1), vmax=np.percentile(data, 99))
-# plt.figure()
-# plt.imshow(white_data, cmap='gray', vmin=np.percentile(white_data, 1), vmax=np.percentile(white_data, 99))
-plt.show()
+    print(header['HERCEXPT'], peaks[1], True if peaks[1] == header['HERCEXPT'] else False)
