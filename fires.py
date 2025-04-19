@@ -9,13 +9,13 @@ from scipy.interpolate import interp1d
 from scipy.signal import find_peaks
 from scipy.ndimage import gaussian_filter, maximum_filter1d, median_filter
 from copy import deepcopy
-# from skimage.morphology import watershed
-# from skimage.feature import peak_local_max
+
 
 current_folder = os.path.dirname(os.path.abspath(__file__))
 template_folder = os.path.join(current_folder, 'template_files')
 
 def open_fits(fitsfile):
+    # OPEN HERCULES FIT(S) FILE, return the header and image data
     hdulist = fits.open(fitsfile)
     data = hdulist[0].data
     header = hdulist[0].header
@@ -23,7 +23,7 @@ def open_fits(fitsfile):
     return header, data
 
 def check_obs_type(header):
-    # Open HERCEXPT card to check the type of observation the file thinks it is
+    # Open HERCEXPT card to check the type of observation the file thinks it is, useful but sometimes unused
     if header['HERCEXPT']==' White Light':
         return 'white'
     elif header['HERCEXPT']==' Thorium Light':
@@ -43,22 +43,18 @@ def get_coords(header):
     return ra, dec
 
 def order_tracing(header, data, extract=False):
-
     # get obs type
-    obs_type = check_obs_type(header)
-    # if obs_type == 'thorium':
-    #     print('Thorium, cannot order trace')
-    #     return None
-    
+    obs_type = check_obs_type(header) #unused currently
+
     reference_column = int(data.shape[0] / 2) # Reference column for tracing (middle of the image)
-    # spatial_profile = np.median(data, axis=0)  # Median collapse along y-axis
+
     spatial_profile = data[reference_column,:] # Collapse along y-axis
 
     # Detect peaks (orders)
     # Apply Gaussian smoothing to reduce noise and enhance weak orders
     smoothed_profile = gaussian_filter(spatial_profile, sigma=5)
     
-    # sobel filter
+    # IDK why this is duplicate of above (but less aggressive) but it works
     smooth_data = data
     smoothed_image = gaussian_filter(smooth_data, sigma=2)
     
@@ -125,27 +121,27 @@ def order_tracing(header, data, extract=False):
     return order_traces
 
 def get_flux_from_orders(data, order_traces):
-    # get obs type
-    # obs_type = check_obs_type(header)
-    
     # Get the flux from the orders
     fluxes = []
     for order in order_traces:
         column_positions, row_positions = order
-        flux = []
-        # fit gaussian across each order per column and extract flux weighted by the gaussian
+        fluxs = []
         
-        for i in range(-3,3):
-            flux.append(data[row_positions, np.array(column_positions)+i])
-        # average the fluxes, weighted by a gaussian shape
-        flux = np.array(flux)
-        flux = np.mean(flux, axis=0)
+        for i in range(-3,4):
+            fluxs.append(data[row_positions, np.array(column_positions)+i])
         
-        # reverse the order
+        fluxs = np.array(fluxs)
+        # TODO: fit gaussian shape across each order per column and extract flux weighted by the gaussian
+        # for now, use some guess weights
+        weights = np.array([0.05, 0.05, 0.15, 0.5, 0.15, 0.05, 0.05])
+        # average the fluxes using the weights
+        flux = np.mean(fluxs, axis=0)
+        # flux = np.average(fluxs, axis=0, weights=weights)
+        
+        # reverse the order as the image is backwards
         flux = flux[::-1]
         fluxes.append(flux)
     return fluxes
-
 
 def norm_orders(order_fluxes):
     # normalise the fluxes
@@ -160,7 +156,7 @@ def norm_orders(order_fluxes):
         # max filter
         order_filter = maximum_filter1d(order_filter, size=40, mode='constant')
 
-        # smooth the order_filter
+        # smooth the traced model aggresively
         order_filter = gaussian_filter(order_filter, sigma=15)
         order_new = order_new/order_filter
         
@@ -191,11 +187,12 @@ def find_tellurics(orders):
             no_peaks += 1
     
     obj_type_guess = ' Stellar'
-    if no_peaks == 0:
+    if no_peaks == 0: #if no peaks are found, it must be a white
         obj_type_guess = ' White Light'
     
     if obj_type_guess == ' Stellar':
-        if len(tellurics) <= 3:
+        if len(tellurics) <= 3: #if few orders are succesfully traced, it is likely a thorium as stellars tend to not struggle with order tracing in the red
+            # TODO: Make this more robust (<= 3 is a bit arbitrary, should try to use size of image or something)
             obj_type_guess = ' Thorium Light'
     return tellurics, obj_type_guess
 
@@ -203,10 +200,17 @@ def find_tellurics(orders):
 files = ['16', '17', '18', '19', '28', '29', '42']
 for i in files:
     header, data = open_fits(f'test_data/correct/J07630{i}.fit')
-    data = data[:, 3300:3600]
+    data = data[:, 3300:3600] #for speed, plus allows for `len(tellurics) <= 3` to be a valid choice
     
     orders = order_tracing(header, data)    
     fluxes = get_flux_from_orders(data, orders)
     norm_fluxes = cut_order_edge(norm_orders(fluxes))
     peaks = find_tellurics(norm_fluxes)
-    print(header['HERCEXPT'], peaks[1], True if peaks[1] == header['HERCEXPT'] else False)
+
+    # flatten orders if stellar
+    if peaks[1] == ' Stellar':
+        plt.figure()
+        norm_fluxes = np.array(norm_fluxes).flatten()
+        plt.plot(norm_fluxes)
+
+plt.show()
