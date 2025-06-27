@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from astropy.io import fits
 import os
+import glob
 
 from fires_base import *
 from order_tracing import *
@@ -11,9 +12,11 @@ from order_tracing import *
 current_folder = os.path.dirname(os.path.abspath(__file__))
 template_folder = os.path.join(current_folder, 'template_files')
 
-files = ['test_data/correct/J0763016.fit', 'test_data/correct/J0763017.fit', 'test_data/correct/J0763018.fit', 'test_data/correct/J0763019.fit', 'test_data/correct/J0763028.fit', 'test_data/correct/J0763029.fit', 'test_data/correct/J0763042.fit']
+data_folder = os.path.join(current_folder, 'test_data', 'correct')
+files = glob.glob(os.path.join(data_folder, '*.fit'))
+# files = ['test_data/correct/J0763016.fit', 'test_data/correct/J0763017.fit', 'test_data/correct/J0763018.fit', 'test_data/correct/J0763019.fit', 'test_data/correct/J0763028.fit', 'test_data/correct/J0763029.fit', 'test_data/correct/J0763042.fit']
 
-checks = pd.DataFrame(columns=['File', 'HERCEXPT', 'Guess', 'Match', 'Seperation'])
+checks = pd.DataFrame(columns=['File', 'HERCEXPT', 'Guess', 'Match', 'Separation'])
 
 for i, file in enumerate(files):
     header, data = open_fits(file)
@@ -33,13 +36,14 @@ for i, file in enumerate(files):
 
     header['HERCEXPT'] = obs_type  # Update header with the determined observation type
     if 'stellar' in obs_type.lower():
-        header = add_new_coords_to_header(header)
-        coords = get_coords(header)
-        print(coords, header['SMBD_RA'], header['SMBD_DEC'])
-
-        checks.loc[i]  = [file,
-        header['HERCEXPT'],
-        obs_type,
-        match
+        header, separation = add_new_coords_to_header(header)
+    else:
+        separation = None
+    checks.loc[i]  = [file,
+    header['HERCEXPT'],
+    obs_type,
+    match,
+    separation
     ]
+    save_new_fits(header, data)
 print(checks)

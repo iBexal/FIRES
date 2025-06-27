@@ -117,24 +117,70 @@ def add_new_coords_to_header(header):
     dec_simbad = result[0]['dec']
 
     # Check if the coordinates are similar to the ones in the header
-    # Assume within ~ 1 arcminute is close enough
+    # Assume within ~ 2 arcminute is close enough
     seperation = 'Small'
     header_coords = SkyCoord(ra, dec, unit=(u.deg, u.deg))
-    simbad_coords = SkyCoord(ra_simbad, dec_simbad, unit=(u.hourangle, u.deg)) 
-    sep = header_coords.separation(simbad_coords)  # Calculate separation btween header coordinates and SIMBAD coordinates
+    simbad_coords = SkyCoord(ra_simbad, dec_simbad, unit=(u.deg, u.deg)) 
 
-    if sep.arcmin > 1:
-        seperation = 'Large'  # If the separation is greater than 1 arcminute, we consider it not similar
+    sep = header_coords.separation(simbad_coords)  # Calculate separation btween header coordinates and SIMBAD coordinates
+    print(sep)
+
+    if sep.arcmin > 2:
+        seperation = 'Large'  # If the separation is greater than 2 arcminute, we consider it not similar
         # Check to see if the simbad coordinates are reasonable for the 1m telescope
         if dec_simbad > 15:
-            seperation = 'Unreasonable'
+            separation = 'Unreasonable'
             print(f'Warning: SIMBAD coordinates for {star_name} are not reasonable for the 1m telescope. Difference from header: {sep.deg:.2f} degrees')
-            return header, seperation
+            return header, separation
 
     ra_simbad_hms, dec_simbad_dms = convert_deg_coords(ra_simbad, dec_simbad) # Convert to HMS and DMS format (: delimited)
 
     # Add the coordinates to the header
     header['SMBD_RA'] = ra_simbad_hms
     header['SMBD_DEC'] = dec_simbad_dms
-    print(ra_simbad, dec_simbad)
+    # print(ra_simbad, dec_simbad)
     return header, seperation
+
+def save_new_fits(header, data, folder=None):
+    # Set up required fields for the new filename
+    obs_date = header['DATE'].strip().replace('-', '')  # Format the date for the filename
+    target_name = header['OBJECT'].strip().replace(' ', '_').replace('-','_')  # Format the target name for the filename
+    exposure_time = header['EXPTIME']
+    if float(exposure_time).is_integer():
+        exposure_time = float(exposure_time)  # Convert to float if it is an integer
+
+    exposure_time = f"{header['EXPTIME']:.1f}".replace('.', 'p').zfill(4)  # Format the exposure time for the filename (1dp, padded to 4 characters if needed), p representing the decimal point
+    if exposure_time[-1] == '0' and exposure_time[-2]=='p':  # If the last two characters are 0 and p, remove them (no need to keep decimal point if it is a whole number)
+        exposure_time = exposure_time[:-2]
+    if len(exposure_time) > 4:
+        exposure_time = exposure_time[:4]
+        if exposure_time[-1] == 'p': # if we truncate and leave the p, no need to keep it
+            exposure_time = exposure_time[:-1]
+
+    # Save the new header and data to a new fits file
+    if folder is None: # default to subfolder in folder of this script
+        current_folder = os.path.dirname(os.path.abspath(__file__))
+        output_folder = os.path.join(current_folder, 'checked_files')
+    else:
+        output_folder = os.path.join(folder, 'checked_files')  # Use provided folder, with a subfolder for new files
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+    
+    running_number = 1
+    # Check number of files in the output folder with the same objectname to determine the running number
+    existing_files = [f for f in os.listdir(output_folder) if f.startswith(f'H{obs_date}-{target_name}-')]
+    if existing_files:
+        running_number += len(existing_files)  # Increment running number based on existing files
+    running_number = str(running_number).zfill(3)  # Pad the running number to 3 characters
+
+    filename_structure = f'H{obs_date}-{target_name}-{exposure_time}-{running_number}.fit' # Set up the filename structure as HYYYYMMDD-Targetname-Exptime-RNo.fit
+    if len(filename_structure) > 30:
+        print(f'Warning: Filename {filename_structure} is too long ({len(filename_structure)} characters...).')
+
+    output_file = os.path.join(output_folder, filename_structure)
+    
+    # Create a new HDU with the updated header and data
+    hdu = fits.PrimaryHDU(data=data, header=header)
+    hdu.writeto(output_file, overwrite=True)
+    
+    print(f'Saved updated FITS file to {output_file}')
