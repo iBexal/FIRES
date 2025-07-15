@@ -63,8 +63,8 @@ If all of these checks fail, the check is failed and the observation type is ret
 If the exposure type is a `Stellar`, SIMBAD will be queried using the object name to generate coordinates. If these coordinates are sufficiently seperated from the coordinates saved in the header, this result is also returned alongside the new header. If the coordinates are further north than +15 degrees, the SIMBAD coordinates are noted as "Unreasonable".
 
 - def save_new_fits(header, data, folder=None):
- - This takes a FITS header, respective data, and a folder location (as a `string`), and saves a new FITS file in a subfolder of `folder` with a given filename structure.
- - If `folder=None` (i.e. it is not defined), the subfolder is created in the same folder as `fires_base.py`.
+ -- This takes a FITS header, respective data, and a folder location (as a `string`), and saves a new FITS file in a subfolder of `folder` with a given filename structure.
+ -- If `folder=None` (i.e. it is not defined), the subfolder is created in the same folder as `fires_base.py`.
 The filename structure is as follows: `HYYYYMMDD-Targetname-Exptime-RNo.fit`; where YYYYMMDD is the date of observation from the header, Targetname is the object name from the header, Exptime is the exposure time from the header , and RNo being the running number of exposures for the given object name and given date.
 The exposure time is saved as four digits long, with frontrunning 0s if required. `p` represents a decimal point if required, with only one decimal place being saved.
 The running number is calculated by the number of files already saved in the subfolder, and is not respective of actual observation time or real numbers of exposures taken.
