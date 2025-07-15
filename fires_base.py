@@ -41,7 +41,7 @@ def guess_obs_with_exptime(header):
         obs_type_guess = ' Unknown'
     return obs_type_guess
 
-def determine_obs_type(header):
+def determine_obs_type(header, log=True):
     thorium_names = ['thar', 'thorium', 'thar lamp', 'throium', 'thorium lamp', 'arc']
     failed = False
     match = True
@@ -69,8 +69,12 @@ def determine_obs_type(header):
     if failed:
         failed = 'Failed'
         print(f'Observation type guess failed for {obj_name} with exposure time {header["EXPTIME"]}. Guess: {obs_type_guess}, HERCEXPT: {exp_type}')
-        return obs_type, failed
-    return obs_type, match
+        if log:
+            return obs_type, failed
+    if log:
+        return obs_type, match
+    else:
+        return obs_type
 
 # gets the saved coordinates from the comment card in the header (only if HERCEXPT is stellar)
 def get_coords(header, deg=False):
@@ -88,13 +92,15 @@ def get_coords(header, deg=False):
         return ra_deg, dec_deg
 
 def convert_deg_coords(ra_deg, dec_deg):
+    assert isinstance(ra_deg, (float, int)), 'RA must be a float or int'
+    assert isinstance(dec_deg, (float, int)), 'DEC must be a float or int'
     # Convert RA from degrees to HMS (RA is measured in hours)
     ra_hms = Angle(ra_deg * u.deg).to_string(unit=u.hour, sep=':', precision=2)
     # Convert DEC from degrees to DMS
     dec_dms = Angle(dec_deg * u.deg).to_string(unit=u.deg, sep=':', alwayssign=True, precision=2)
     return ra_hms, dec_dms
 
-def add_new_coords_to_header(header):
+def add_new_coords_to_header(header, log=True):
     # Set up Simbad query
     simbad = Simbad()
     simbad.TIMEOUT = 500  # Increase timeout for Simbad queries
@@ -131,15 +137,20 @@ def add_new_coords_to_header(header):
         if dec_simbad > 15:
             separation = 'Unreasonable'
             print(f'Warning: SIMBAD coordinates for {star_name} are not reasonable for the 1m telescope. Difference from header: {sep.deg:.2f} degrees')
-            return header, separation
+            if log:
+                return header, separation
+            else:
+                return header
 
     ra_simbad_hms, dec_simbad_dms = convert_deg_coords(ra_simbad, dec_simbad) # Convert to HMS and DMS format (: delimited)
 
     # Add the coordinates to the header
     header['SMBD_RA'] = ra_simbad_hms
     header['SMBD_DEC'] = dec_simbad_dms
-    # print(ra_simbad, dec_simbad)
-    return header, seperation
+    if log:
+        return header, seperation
+    else:
+        return header
 
 def save_new_fits(header, data, folder=None):
     # Set up required fields for the new filename
