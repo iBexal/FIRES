@@ -13,7 +13,7 @@ from copy import deepcopy
 
 def order_tracing(header, data, extract=False):
     # get obs type
-
+    data = data[:, 3300:3600] #for speed, plus allows for `len(tellurics) <= 3` to be a valid choice
     reference_column = int(data.shape[0] / 2) # Reference column for tracing (middle of the image)
 
     spatial_profile = data[reference_column,:] # Collapse along y-axis

@@ -72,3 +72,4 @@ The filename structure is as follows: `HYYYYMMDD-Targetname-Exptime-RNo.fit`; wh
 The exposure time is saved as four digits long, with frontrunning 0s if required. `p` represents a decimal point if required, with only one decimal place being saved.
 The running number is calculated by the number of files already saved in the subfolder, and is not respective of actual observation time or real numbers of exposures taken.
 
+**fires_run.py**

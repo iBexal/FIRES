@@ -7,6 +7,10 @@ import astropy.units as u
 import os
 from astroquery.simbad import Simbad
 from astropy.coordinates import SkyCoord
+import glob
+import time
+
+from order_tracing import *
 
 
 def open_fits(fitsfile):
@@ -104,6 +108,9 @@ def add_new_coords_to_header(header, log=True):
     # Set up Simbad query
     simbad = Simbad()
     simbad.TIMEOUT = 500  # Increase timeout for Simbad queries
+    # Wait 0.1 seconds to avoid hitting the server too hard and getting banned lol
+    time.sleep(0.1)
+
     simbad.add_votable_fields('ra', 'dec')
     # Add a key-value pair to the header
     star_name = header['OBJECT']
@@ -129,7 +136,6 @@ def add_new_coords_to_header(header, log=True):
     simbad_coords = SkyCoord(ra_simbad, dec_simbad, unit=(u.deg, u.deg)) 
 
     sep = header_coords.separation(simbad_coords)  # Calculate separation btween header coordinates and SIMBAD coordinates
-    print(sep)
 
     if sep.arcmin > 2:
         seperation = 'Large'  # If the separation is greater than 2 arcminute, we consider it not similar
@@ -195,3 +201,72 @@ def save_new_fits(header, data, folder=None):
     hdu.writeto(output_file, overwrite=True)
     
     print(f'Saved updated FITS file to {output_file}')
+    return output_file  # Return the path to the new file
+
+def check_files(files_folder, log_obs_type=True, log_new_coords=True):
+    files = glob.glob(os.path.join(files_folder, '*.fit'))
+    # Check to see if a checked files folder exists and contains .fit files. If so, warn user and prompt to continue or not
+    checked_files_folder = os.path.join(files_folder, 'checked_files')
+    if os.path.exists(checked_files_folder) and glob.glob(os.path.join(checked_files_folder, '*.fit')):
+        print(f'Warning: {checked_files_folder} already exists and contains files. This will NOT overwrite existing files, but there may be duplicates and the log file may not make sense.')
+        user_input = input('Do you want to continue? (y/n): ')
+        while user_input.lower() != 'y' and user_input.lower() != 'n':
+            print('Invalid input. Please enter "y" or "n".')
+            user_input = input('Do you want to continue? (y/n): ')
+        if user_input.lower() == 'n':
+            print('Exiting...')
+            return
+    # SETUP
+    checks_list = ['File', 'New_File', 'HERCEXPT', 'Guess']
+    if log_obs_type:
+        checks_list.append('Match')
+    if log_new_coords:
+        checks_list.append('Separation')
+    if log_obs_type or log_new_coords:
+        checks = pd.DataFrame(columns=checks_list)  # Initialize the DataFrame to store results
+    # SETUP END
+
+    for i, file in enumerate(files):
+        header, data = open_fits(file)
+        if log_obs_type:
+            obs_type, match = determine_obs_type(header)
+            if match == 'Failed':
+                # We need to go deeper
+                orders = order_tracing(header, data)
+                fluxes = get_flux_from_orders(data, orders)
+                norm_fluxes = cut_order_edge(norm_orders(fluxes))
+                peaks, obs_type = find_tellurics_exp_type(norm_fluxes)
+                match = 'order_traced'
+        else:
+            obs_type =  determine_obs_type(header, log=False)
+        header['EXPTGUES'] = obs_type # Update header with the determined observation type
+
+        # Check if the observation type is stellar and add new coordinates to the header if applicable
+        if 'stellar' in obs_type.lower() and log_new_coords:
+            header, separation = add_new_coords_to_header(header)
+        elif 'stellar' in obs_type.lower():
+            header = add_new_coords_to_header(header, log=False)
+            separation = 'N/A'
+        else:
+            separation = 'N/A'
+        new_file = save_new_fits(header, data, folder=files_folder)
+        # Log results if either log option is enabled
+        if log_obs_type and log_new_coords:
+            checks.loc[i] = [file, new_file, header['HERCEXPT'], obs_type, match, separation]
+        elif log_obs_type:
+            checks.loc[i] = [file, new_file, header['HERCEXPT'], obs_type, match]
+        elif log_new_coords:
+            checks.loc[i] = [file, new_file, header['HERCEXPT'], obs_type, separation]
+        
+        
+    # Check if log file exists (and if so, how many), and append a number to the filename if it does
+    log_filename = 'check_output.txt'
+    log_file_path = os.path.join(files_folder, 'checked_files', log_filename)
+    if os.path.exists(log_file_path):
+        existing_logs = glob.glob(os.path.join(files_folder, 'checked_files', 'check_output*.txt'))
+        if existing_logs:
+            log_number = len(existing_logs) + 1
+            log_filename = f'check_output_{log_number}.txt'
+            log_file_path = os.path.join(files_folder, 'checked_files', log_filename)
+    # Save the checks DataFrame to a text file in the checked_files folder
+    checks.to_csv(os.path.join(log_file_path), index=False)
