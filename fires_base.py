@@ -239,7 +239,7 @@ def check_files(files_folder, log_obs_type=True, log_new_coords=True):
                 match = 'order_traced'
         else:
             obs_type =  determine_obs_type(header, log=False)
-        header['EXPTGUES'] = obs_type # Update header with the determined observation type
+        header['HERCEXPT'] = obs_type # Update header with the determined observation type
 
         # Check if the observation type is stellar and add new coordinates to the header if applicable
         if 'stellar' in obs_type.lower() and log_new_coords:
