@@ -59,7 +59,7 @@ The ra and dec must be `float` or `int`.
 This takes a header and adds new cards based on the sexigesimal coordinates saved in the comment of the header, and coordinates from SIMBAD. The updated header is returned.
 If the exposure type is a `Stellar`, SIMBAD will be queried using the object name to generate coordinates. If these coordinates are sufficiently seperated from the coordinates saved in the header, this result is also returned alongside the new header. If the coordinates are further north than +15 degrees, the SIMBAD coordinates are noted as "Unreasonable".
 
-- def save_new_fits(header, data, folder=None)
+- def save_new_fits(header, data, folder=None):
 This takes a FITS header, respective data, and a folder location (as a `string`), and saves a new FITS file in a subfolder of `folder` with a given filename structure.
 If `folder=None` (i.e. it is not defined), the subfolder is created in the same folder as `fires_base.py`.
 The filename structure is as follows: `HYYYYMMDD-Targetname-Exptime-RNo.fit`; where YYYYMMDD is the date of observation from the header, Targetname is the object name from the header, Exptime is the exposure time from the header , and RNo being the running number of exposures for the given object name and given date.
