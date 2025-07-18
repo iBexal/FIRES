@@ -1,4 +1,1 @@
-checked_files/
-template_files/
-test_data/
-*.fit
+/template_files
