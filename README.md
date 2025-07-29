@@ -2,7 +2,7 @@
 FIRES (Fits Information Revision and Extraction System) is designed to run through archival and new HERCULES observations to determine whether the FITS header includes correct information, and adds some new useful information.
 
 ## Status
-FIRES is currently being maintained and hosted up to date here. It will eventually be moved to another github, and this status will be updated to reflect that.
+FIRES is currently being maintained and hosted up to date here (github).
 ## Installation
 Download the .zip and extract to your desired location. You can also clone the git by running
 ```
